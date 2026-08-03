@@ -1,0 +1,23 @@
+[project]
+name = "voice-dubbing-runtime"
+version = "0.1.0"
+description = "Isolated CPU-only Voice Dubbing Phase 1 research probe"
+requires-python = ">=3.11,<3.12"
+dependencies = [
+    "huggingface-hub==0.36.2",
+    "numpy==1.26.4",
+    "psutil==7.2.2",
+    "torch==2.6.0",
+    "torchaudio==2.6.0",
+    "transformers==4.49.0",
+    "TTS @ git+https://github.com/thinhlpg/TTS.git@ff217b3f27b294de194cc59c5119d1e08b06413c",
+]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.uv.sources]
+torch = { index = "pytorch-cpu" }
+torchaudio = { index = "pytorch-cpu" }
