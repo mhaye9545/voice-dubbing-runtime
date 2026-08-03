@@ -1,0 +1,10 @@
+# Isolated XTTS-v2 CPU runtime (Python 3.11 only).
+# coqui-tts is the maintained Windows-compatible fork; imports stay under TTS.
+# Keep this separate from voice-dubbing-runtime/.venv-cpu.
+coqui-tts[ko,zh]==0.27.5
+huggingface-hub==0.36.2
+numpy==1.26.4
+psutil==7.2.2
+torch==2.6.0+cpu
+torchaudio==2.6.0+cpu
+transformers==4.57.6

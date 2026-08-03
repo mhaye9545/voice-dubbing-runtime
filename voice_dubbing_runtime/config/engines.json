@@ -1,0 +1,56 @@
+{
+  "schema_version": 1,
+  "engines": [
+    {
+      "id": "vixtts_vi",
+      "display_name": "viXTTS (Vietnamese)",
+      "priority": 10,
+      "languages": ["vi"],
+      "language_source": "engine_contract",
+      "devices": ["cpu"],
+      "profile_types": ["cloned", "preset"],
+      "supports_keep_model_loaded": false,
+      "required_paths": [
+        ".venv-cpu/Scripts/python.exe",
+        "vendor/TTS-ff217b3f27b294de194cc59c5119d1e08b06413c/TTS/tts/models/xtts.py",
+        "models/capleaf_viXTTS_c06f43788831/config.json",
+        "models/capleaf_viXTTS_c06f43788831/model.pth",
+        "models/capleaf_viXTTS_c06f43788831/vocab.json"
+      ],
+      "backend": "voice_dubbing_runtime.vixtts_backend:VixttsBackend"
+    },
+    {
+      "id": "xtts_v2_multilingual",
+      "display_name": "XTTS-v2 Multilingual",
+      "priority": 20,
+      "languages": [],
+      "language_source": "model_config",
+      "model_config_path": "models/xtts_v2/config.json",
+      "model_languages_key": "languages",
+      "devices": ["cpu"],
+      "profile_types": ["cloned", "preset"],
+      "supports_keep_model_loaded": true,
+      "required_paths": [
+        ".venv-xtts/Scripts/python.exe",
+        "models/xtts_v2/LICENSE.txt",
+        "models/xtts_v2/config.json",
+        "models/xtts_v2/dvae.pth",
+        "models/xtts_v2/mel_stats.pth",
+        "models/xtts_v2/model.pth",
+        "models/xtts_v2/speakers_xtts.pth",
+        "models/xtts_v2/vocab.json",
+        "models/xtts_v2/model_manifest.json",
+        "models/xtts_v2/engine_health.json"
+      ],
+      "health_report_path": "models/xtts_v2/engine_health.json",
+      "health_required_values": {
+        "model_load": "Pass",
+        "synthesis_smoke": "Pass",
+        "ffmpeg_decode": "Pass",
+        "model_revision": "6c2b0d75eae4b7047358e3b6bd9325f857d43f77"
+      },
+      "health_required_languages": ["en", "ko", "zh-cn"],
+      "backend": "voice_dubbing_runtime.xtts_backend:XttsV2Backend"
+    }
+  ]
+}
