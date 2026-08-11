@@ -42,6 +42,7 @@ MODEL_REVISION = "6c2b0d75eae4b7047358e3b6bd9325f857d43f77"
 PACKAGE_REVISION = "coqui-tts==0.27.5"
 PERSISTENT_MIN_AVAILABLE_RAM_BYTES = int(5.5 * 1024**3)
 WORKER_TIMEOUT_SECONDS = 3600.0
+WORKER_FINALIZATION_TIMEOUT_SECONDS = 15.0
 
 
 class XttsV2Backend:
@@ -397,35 +398,83 @@ class XttsV2Backend:
                 "Could not launch the XTTS-v2 worker.",
                 {"command": command, "exception_type": type(exc).__name__, "traceback": traceback.format_exc()},
             ) from exc
+        assert process.stdout is not None and process.stderr is not None
+        events: queue.Queue[tuple[str, str]] = queue.Queue()
+        stdout_lines: list[str] = []
+        stderr_lines: list[str] = []
+        reader_threads = [
+            threading.Thread(
+                target=self._reader,
+                args=("stdout", process.stdout, events, stdout_lines),
+                daemon=True,
+            ),
+            threading.Thread(
+                target=self._reader,
+                args=("stderr", process.stderr, events, stderr_lines),
+                daemon=True,
+            ),
+        ]
+        for thread in reader_threads:
+            thread.start()
         started = time.perf_counter()
+        final: dict[str, Any] | None = None
+        stdout_eof = False
         try:
             assert process.stdin is not None
             process.stdin.write(json.dumps(request, ensure_ascii=False))
             process.stdin.close()
             process.stdin = None
-            while process.poll() is None:
+            while final is None and not stdout_eof:
                 if self._cancelled(cancel_token):
                     self._kill_tree(process)
                     raise VoiceRuntimeError(CANCELLED, "Voice synthesis was cancelled.")
                 if time.perf_counter() - started > WORKER_TIMEOUT_SECONDS:
                     self._kill_tree(process)
                     raise VoiceRuntimeError(XTTS_WORKER_TIMEOUT, "XTTS-v2 worker timed out.")
-                time.sleep(0.1)
-            stdout, stderr = process.communicate()
+                try:
+                    channel, line = events.get(timeout=0.1)
+                except queue.Empty:
+                    if process.poll() is not None and not any(
+                        thread.is_alive() for thread in reader_threads
+                    ):
+                        break
+                    continue
+                if line == "@@EOF":
+                    if channel == "stdout":
+                        stdout_eof = True
+                    continue
+                if channel != "stdout":
+                    continue
+                marker = self._parse_marker(line)
+                if marker is None:
+                    continue
+                if marker.get("type") == "stage":
+                    progress(
+                        str(marker.get("name", "load_model")),
+                        float(marker.get("progress", 0.0)),
+                    )
+                elif marker.get("type") == "result" and marker.get("job_id") == request["job_id"]:
+                    final = marker
+
+            # The terminal result is authoritative. Child cleanup happens only
+            # after it has been captured and is bounded so a stuck ML teardown
+            # cannot discard an already-produced successful synthesis.
+            if final is not None and process.poll() is None:
+                try:
+                    process.wait(timeout=WORKER_FINALIZATION_TIMEOUT_SECONDS)
+                except subprocess.TimeoutExpired:
+                    self._kill_tree(process)
+            elif final is None and process.poll() is None:
+                self._kill_tree(process)
         finally:
             if process.poll() is None:
                 self._kill_tree(process)
-        final: dict[str, Any] | None = None
-        for line in stdout.splitlines():
-            marker = self._parse_marker(line)
-            if marker is None:
-                continue
-            if marker.get("type") == "stage":
-                progress(str(marker.get("name", "load_model")), float(marker.get("progress", 0.0)))
-            elif marker.get("type") == "result" and marker.get("job_id") == request["job_id"]:
-                final = marker
+            for thread in reader_threads:
+                thread.join(timeout=1.0)
+        stdout = "\n".join(stdout_lines)
+        stderr = "\n".join(stderr_lines)
         elapsed = time.perf_counter() - started
-        if process.returncode != 0 or final is None or final.get("status") != "success":
+        if final is None or final.get("status") != "success":
             self._raise_failure(
                 request=request,
                 command=command,
@@ -616,7 +665,7 @@ class XttsV2Backend:
                     process.stdin.write(json.dumps({"schema_version": 1, "action": "shutdown"}) + "\n")
                     process.stdin.flush()
                     process.stdin.close()
-                process.wait(timeout=15)
+                process.wait(timeout=WORKER_FINALIZATION_TIMEOUT_SECONDS)
             except (OSError, subprocess.TimeoutExpired):
                 self._kill_tree(process)
             finally:
