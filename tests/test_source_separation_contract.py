@@ -312,7 +312,7 @@ class SourceSeparationManifestTests(SourceSeparationFixture):
 class SourceSeparationLauncherTests(SourceSeparationFixture):
     def _run(self, *, mode: str, token=None, timeout: float = 5.0):
         requests: list[dict] = []
-        source = self.root / "fixtures" / "Lester H\u1ed3t – tiếng Anh.wav"
+        source = self.root / "fixtures" / "synthetic English voice.wav"
         _write_wav(source)
         output = self.root / "runs" / "kiểm thử" / "ref_voice_only.wav"
         work = self.root / "runs" / "kiểm thử" / "work"

@@ -106,7 +106,7 @@ def profile_row(
     *,
     status: str = "READY",
     profile_type: str = "cloned",
-    profile_path: str = "C:/profiles/ready_voice",
+    profile_path: str = "C:/test-data/profiles/sample_voice",
 ) -> dict[str, Any]:
     return {
         "schema_version": 1,

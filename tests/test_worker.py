@@ -70,8 +70,8 @@ class WorkerTests(unittest.TestCase):
         reference = write_pcm_wav(self.base / "ref.wav")
         self.reference = reference
         self.profiles.create(
-            profile_id="lua_china_base",
-            display_name="Lụa ở China",
+            profile_id="sample_voice",
+            display_name="Vietnamese Test Voice",
             profile_type="cloned",
             source_type="audio",
             default_language="vi",
@@ -89,7 +89,7 @@ class WorkerTests(unittest.TestCase):
             "schema_version": 1,
             "job_id": job_id,
             "action": "synthesize",
-            "profile_id": "lua_china_base",
+            "profile_id": "sample_voice",
             "text": "Xin chào thế giới",
             "language": "vi",
             "engine": "auto",
@@ -201,7 +201,7 @@ class WorkerTests(unittest.TestCase):
         self.assertFalse((Path(job["output_dir"]) / "source_normalized.wav").exists())
 
     def test_profile_preference_is_attempted_before_auto(self) -> None:
-        self.profiles.update("lua_china_base", engine_preference="missing_preferred")
+        self.profiles.update("sample_voice", engine_preference="missing_preferred")
         registry = FakeRegistry()
         worker, _stream, registry = self.make_worker(registry)
         with patch("voice_dubbing_runtime.worker.resolve_ffmpeg", return_value=self.base / "fake.exe"), patch(
@@ -214,7 +214,7 @@ class WorkerTests(unittest.TestCase):
 
     def test_auto_language_resolves_from_runtime_capability(self) -> None:
         self.profiles.update(
-            "lua_china_base",
+            "sample_voice",
             default_language="auto",
             engine_preference="auto",
         )
