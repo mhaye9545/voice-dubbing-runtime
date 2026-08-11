@@ -41,6 +41,8 @@ For the full project description, current implementation details and roadmap in 
 - Profile revisions, integrity locks and update history.
 - Job artifacts: `job.json`, `run.log`, `result.json`.
 - Stable machine-readable markers prefixed with `@@VOICE_DUB|`.
+- Standalone PySide6 thin-client GUI in `voice_dubbing_app/` with profile,
+  reference-review and synthesis workspaces.
 
 ### Reference preparation
 
@@ -85,7 +87,7 @@ For the full project description, current implementation details and roadmap in 
 ## Architecture
 
 ```text
-CLI / future Desktop GUI / external client
+Standalone Desktop GUI / CLI / external client
                 |
                 v
       voice_dubbing_runtime
@@ -133,9 +135,27 @@ synthesize
 
 ---
 
+## Standalone GUI (development)
+
+Install the optional GUI dependency in a compatible Python 3.11 environment:
+
+```powershell
+python -m pip install -e ".[gui]"
+python -m voice_dubbing_app
+```
+
+The GUI is a thin client. Startup performs capability discovery and profile
+inventory only; it does not load or download a model. Heavy jobs are sent to
+the existing `.venv-cpu` JSONL worker, and engine-specific ML stacks remain in
+their isolated runtime processes.
+
+---
+
 ## Verification
 
-The repository currently contains **80 unit/contract test cases** covering capabilities, CLI, media handling, profile robustness, reference flow, source separation, worker behavior and XTTS contracts.
+The repository currently contains **108 unit/contract test cases**, including
+28 offscreen GUI tests plus the existing capability, CLI, media, profile,
+reference, source-separation, worker and XTTS contract coverage.
 
 Run tests with the project's pinned Python 3.11 environment:
 
@@ -179,7 +199,7 @@ Before calling the project public-ready, the current repository still needs:
 - a `doctor`/health-check command;
 - Windows CI on Python 3.11;
 - a policy for vendored TTS source;
-- a standalone GUI;
+- manual desktop and real-model acceptance for the standalone GUI;
 - clean-machine packaging and release tests.
 
 ---
@@ -205,6 +225,11 @@ Before calling the project public-ready, the current repository still needs:
 - `doctor` command for runtime/model/dependency health.
 
 ### Phase 2 — Standalone desktop GUI
+
+The first thin-client implementation is now present in source. Offscreen GUI
+tests cover runtime marker parsing, profile create/update state isolation,
+manual-review commit gates and synthesis capability filtering. Normal desktop
+UX and real-model acceptance are still required before a release claim.
 
 First GUI scope:
 
