@@ -54,6 +54,7 @@ def build_broken_split_fixture(root: Path) -> tuple[Path, str, str]:
         "profile_id": "lua_china_base",
         "created_at": created,
         "status": "TECHNICAL_PASS_PENDING_LISTENING",
+        "manual_listening": "PENDING",
         "engine": "vixtts",
         "device": "cpu",
         "language": "vi",

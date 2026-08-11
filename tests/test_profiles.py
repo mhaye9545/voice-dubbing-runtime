@@ -213,6 +213,28 @@ class VoiceProfileManagerTests(unittest.TestCase):
         self.assertTrue(Path(deleted["recoverable_path"]).is_dir())
         self.assertEqual([], self.manager.list())
 
+    def test_legacy_lester_profile_id_round_trips_without_display_name_contract(self) -> None:
+        created = self.manager.create(
+            profile_id="lestehrolt_en_clean",
+            display_name="Synthetic English Profile",
+            profile_type="cloned",
+            source_type="audio",
+            source_language="en",
+            default_language="en",
+            engine_preference="xtts_v2_multilingual",
+            reference_files=[self.reference],
+            consent=self.consent,
+        )
+        self.assertEqual("lestehrolt_en_clean", created["profile_id"])
+        self.assertEqual(
+            "Synthetic English Profile",
+            self.manager.load("lestehrolt_en_clean")["display_name"],
+        )
+        self.assertEqual(1, self.manager.profile_revision("lestehrolt_en_clean"))
+        listed = {row["profile_id"]: row for row in self.manager.list()}
+        self.assertEqual({"lestehrolt_en_clean"}, set(listed))
+        self.assertEqual("READY", listed["lestehrolt_en_clean"]["profile_status"])
+
 
 if __name__ == "__main__":
     unittest.main()
