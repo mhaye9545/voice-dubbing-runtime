@@ -1,4 +1,4 @@
-"""Create three non-committable reference A/B pairs inside a target window.
+"""Create non-committable reference A/B pairs inside a target window.
 
 This audit helper performs real, isolated Demucs source separation on each
 short candidate.  It never edits a profile, creates ``ref_primary.wav``, or
@@ -10,10 +10,15 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import sys
 import time
 import uuid
 from pathlib import Path
 from typing import Any
+
+RUNTIME_ROOT = Path(__file__).resolve().parents[1]
+if str(RUNTIME_ROOT) not in sys.path:
+    sys.path.insert(0, str(RUNTIME_ROOT))
 
 from voice_dubbing_runtime.io_utils import sha256_file, utc_now, write_json_exclusive
 from voice_dubbing_runtime.media import (
@@ -25,14 +30,6 @@ from voice_dubbing_runtime.media import (
 from voice_dubbing_runtime.reference_quality import validate_voice_only_reference
 from voice_dubbing_runtime.source_separation import SourceSeparationRunner
 from voice_dubbing_runtime.worker import CancellationToken, PeakMemoryMonitor
-
-
-TARGET_WINDOW = {"start_seconds": 0.0, "end_seconds": 50.0}
-CANDIDATES = (
-    (1, 0.290375, 13.074667),
-    (2, 13.074667, 27.737854),
-    (3, 35.712500, 49.371500),
-)
 
 
 def _write_text_exclusive(path: Path, text: str) -> None:
@@ -63,6 +60,18 @@ def _background_assessment(validation: dict[str, Any]) -> str:
     if status == "PASS":
         return "TECHNICAL_PROXY_PASS_PENDING_LISTENING"
     return f"{status or 'UNVERIFIED'}_PENDING_LISTENING"
+
+
+def _time_range(value: str) -> tuple[float, float]:
+    try:
+        start_text, end_text = value.split(":", 1)
+        start = float(start_text)
+        end = float(end_text)
+    except (TypeError, ValueError) as exc:
+        raise argparse.ArgumentTypeError("expected START:END in seconds") from exc
+    if start < 0.0 or end <= start:
+        raise argparse.ArgumentTypeError("time range must satisfy 0 <= START < END")
+    return start, end
 
 
 def _candidate_report(
@@ -116,14 +125,18 @@ def _candidate_report(
 
 
 def _markdown(report: dict[str, Any]) -> str:
+    target = report["target_speaker_window"]
     lines = [
-        "# Manual Reference Candidate Round — Target Speaker 0–50 s",
+        "# Manual Reference Candidate Round",
         "",
         f"Status: `{report['status']}`",
         "",
         "No candidate is selected. No profile/reference was committed and no synthesis was run.",
         "",
-        "Target speaker window: `0.0–50.0 s`.",
+        (
+            "Target speaker window: "
+            f"`{target['start_seconds']:.6f}–{target['end_seconds']:.6f} s`."
+        ),
         "",
         "| Candidate | Start–end | Duration | Voice-only peak/RMS | Clipping | Speech ratio | Background | Decode | Elapsed | Peak RAM | Leftover |",
         "|---|---:|---:|---:|---:|---:|---|---|---:|---:|---:|",
@@ -147,7 +160,7 @@ def _markdown(report: dict[str, Any]) -> str:
         [
             "",
             "Technical acoustic metrics do not prove speaker identity or inaudible background.",
-            "The user must listen to all three pairs before any winner or commit decision.",
+            "The user must listen to all candidate pairs before any winner or commit decision.",
             "",
         ]
     )
@@ -155,12 +168,53 @@ def _markdown(report: dict[str, Any]) -> str:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--runtime-root", type=Path, required=True)
-    parser.add_argument("--source", type=Path, required=True)
-    parser.add_argument("--output-root", type=Path, required=True)
-    parser.add_argument("--ffmpeg", type=Path, required=True)
+    parser = argparse.ArgumentParser(
+        description=(
+            "Create non-committable source-mix/voice-only reference pairs for "
+            "manual listening review. This command never updates a voice profile."
+        )
+    )
+    parser.add_argument("--runtime-root", type=Path, required=True, help="Runtime checkout root")
+    parser.add_argument("--source", type=Path, required=True, help="Source audio or video")
+    parser.add_argument(
+        "--source-type",
+        choices=("audio", "video"),
+        required=True,
+        help="How the source should be decoded",
+    )
+    parser.add_argument(
+        "--output-root", type=Path, required=True, help="Parent directory for a new batch"
+    )
+    parser.add_argument("--ffmpeg", type=Path, required=True, help="FFmpeg executable")
+    parser.add_argument(
+        "--target-window",
+        type=_time_range,
+        required=True,
+        metavar="START:END",
+        help="Allowed target-speaker window in seconds",
+    )
+    parser.add_argument(
+        "--candidate",
+        dest="candidates",
+        action="append",
+        type=_time_range,
+        required=True,
+        metavar="START:END",
+        help="Candidate interval in seconds; repeat for each candidate",
+    )
     args = parser.parse_args()
+
+    target_start, target_end = args.target_window
+    target_window = {"start_seconds": target_start, "end_seconds": target_end}
+    candidates = list(args.candidates)
+    for index, (start, end) in enumerate(candidates, 1):
+        if not (
+            target_window["start_seconds"] <= start < end <= target_window["end_seconds"]
+            and 12.0 <= end - start <= 20.0
+        ):
+            parser.error(
+                f"candidate {index} must stay inside --target-window and last 12–20 seconds"
+            )
 
     runtime_root = args.runtime_root.expanduser().resolve()
     source = args.source.expanduser().resolve()
@@ -176,12 +230,7 @@ def main() -> int:
     reports: list[dict[str, Any]] = []
     batch_started = time.perf_counter()
 
-    for index, start, end in CANDIDATES:
-        if not (
-            TARGET_WINDOW["start_seconds"] <= start < end <= TARGET_WINDOW["end_seconds"]
-            and 12.0 <= end - start <= 20.0
-        ):
-            raise ValueError(f"Candidate {index} escapes the approved target/duration contract")
+    for index, (start, end) in enumerate(candidates, 1):
         source_mix = output_dir / f"ref_source_mix_candidate_{index:02d}.wav"
         voice_only = output_dir / f"ref_voice_only_candidate_{index:02d}.wav"
         separation_input = output_dir / f".candidate_{index:02d}_input.wav"
@@ -194,7 +243,7 @@ def main() -> int:
                 cut_reference(source, source_mix, start, end)
                 prepare_separation_candidate(
                     source,
-                    "audio",
+                    args.source_type,
                     separation_input,
                     start,
                     end,
@@ -242,7 +291,7 @@ def main() -> int:
         "created_at": utc_now(),
         "source": str(source),
         "source_sha256": sha256_file(source),
-        "target_speaker_window": TARGET_WINDOW,
+        "target_speaker_window": target_window,
         "candidate_count": len(reports),
         "candidates": reports,
         "candidate_winner": None,
