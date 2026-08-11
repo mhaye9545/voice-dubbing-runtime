@@ -48,11 +48,14 @@ Dự án ban đầu được tách ra từ luồng Voice Dubbing của FrameExtr
 - XTTS-v2 hỗ trợ persistent worker để giữ model trong RAM giữa nhiều lượt synthesis.
 - Model/runtime integrity gate bằng version, manifest, file size và SHA-256.
 - Cancellation, progress marker, durable `job.json`, `run.log`, `result.json` cho mỗi job.
-- Bộ unit/contract tests hiện có **80 test cases** trong `tests/`.
+- Bộ unit/contract tests hiện có **108 test cases** trong `tests/`, gồm 28 GUI
+  tests offscreen và toàn bộ runtime/source-separation/XTTS contract tests cũ.
+- GUI standalone PySide6 dạng thin client trong `voice_dubbing_app/`, gồm workspace
+  profile/reference review và workspace tạo giọng.
 
 ### Chưa có / chưa public-ready
 
-- Chưa có standalone desktop GUI trong repo này.
+- GUI standalone chưa qua manual desktop UX và real-model acceptance để phát hành.
 - Chưa có installer/portable release cho người dùng cuối.
 - Chưa có một lệnh bootstrap duy nhất dựng toàn bộ runtime từ máy sạch.
 - Storage path vẫn còn tên legacy của FrameExtract Studio.
@@ -66,7 +69,7 @@ Dự án ban đầu được tách ra từ luồng Voice Dubbing của FrameExtr
 ## 3. Kiến trúc hiện tại
 
 ```text
-CLI / future Desktop GUI / external client
+Standalone Desktop GUI / CLI / external client
                 |
                 v
       voice_dubbing_runtime
@@ -235,6 +238,21 @@ Machine-readable marker được prefix bằng:
 
 ---
 
+### Chạy standalone GUI trong development
+
+Cài optional GUI dependency trong một environment Python 3.11 phù hợp rồi chạy:
+
+```powershell
+python -m pip install -e ".[gui]"
+python -m voice_dubbing_app
+```
+
+GUI chỉ là thin client. Khi mở app, GUI chỉ đọc capability và profile inventory;
+không load/download model. Các job nặng được gửi tới JSONL worker hiện có trong
+`.venv-cpu`, còn ML stack của từng engine vẫn nằm trong process/environment cô lập.
+
+---
+
 ## 8. Kiểm thử
 
 Test suite hiện bao phủ các nhóm chính:
@@ -321,20 +339,24 @@ Repo hiện có vendored TTS source mang Mozilla Public License 2.0. Trước pu
 
 ### Phase 2 — Standalone Desktop GUI
 
+Thin-client GUI đầu tiên hiện đã có trong source. GUI tests offscreen bao phủ
+marker parser, tách state create/update, manual-review commit gate và capability
+filter cho synthesis. Manual desktop UX và real-model acceptance vẫn còn pending.
+
 Mục tiêu GUI đầu tiên:
 
-- [ ] chọn video/audio;
+- [x] chọn video/audio;
 - [ ] hiển thị metadata nguồn;
-- [ ] chọn target-speaker window;
-- [ ] auto/manual reference 8–15 giây;
-- [ ] bật source separation khi source có nhạc/nền;
-- [ ] nghe A/B `source mix` và `voice only`;
-- [ ] xác nhận consent và single-speaker trước commit;
-- [ ] tạo/cập nhật/xóa voice profile;
-- [ ] nhập text, language, engine, speed;
-- [ ] synthesize, nghe preview và lưu WAV;
-- [ ] progress, cancel, lỗi có mã rõ ràng;
-- [ ] xem log/job result khi cần chẩn đoán.
+- [x] chọn target-speaker window;
+- [x] auto/manual reference 8–15 giây;
+- [x] ghi nhận background audio để runtime tự quyết định source separation;
+- [x] nghe A/B `source mix` và `voice only`;
+- [x] xác nhận consent và single-speaker trước commit;
+- [x] tạo/cập nhật/xóa voice profile;
+- [x] nhập text, language, engine, speed;
+- [x] synthesize, nghe preview và lưu WAV;
+- [x] progress, cancel, lỗi có mã rõ ràng;
+- [x] xem log/job result khi cần chẩn đoán.
 
 GUI phải là **thin client**: không chứa ML/business logic vốn đã nằm trong runtime.
 
