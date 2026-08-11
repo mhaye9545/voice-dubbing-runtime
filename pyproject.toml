@@ -10,7 +10,6 @@ dependencies = [
     "torch==2.6.0",
     "torchaudio==2.6.0",
     "transformers==4.49.0",
-    "TTS @ git+https://github.com/thinhlpg/TTS.git@ff217b3f27b294de194cc59c5119d1e08b06413c",
 ]
 
 [project.optional-dependencies]
