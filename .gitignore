@@ -12,6 +12,18 @@ models/
 runs/
 compat_backup/
 
+# The pinned TTS source contains Python packages in nested ``models``
+# directories.  Keep those source files versioned while runtime model weights
+# remain ignored by the general rule above.
+!vendor/TTS-ff217b3f27b294de194cc59c5119d1e08b06413c/TTS/encoder/models/
+!vendor/TTS-ff217b3f27b294de194cc59c5119d1e08b06413c/TTS/encoder/models/**
+!vendor/TTS-ff217b3f27b294de194cc59c5119d1e08b06413c/TTS/tts/models/
+!vendor/TTS-ff217b3f27b294de194cc59c5119d1e08b06413c/TTS/tts/models/**
+!vendor/TTS-ff217b3f27b294de194cc59c5119d1e08b06413c/TTS/vc/models/
+!vendor/TTS-ff217b3f27b294de194cc59c5119d1e08b06413c/TTS/vc/models/**
+!vendor/TTS-ff217b3f27b294de194cc59c5119d1e08b06413c/TTS/vocoder/models/
+!vendor/TTS-ff217b3f27b294de194cc59c5119d1e08b06413c/TTS/vocoder/models/**
+
 # Python caches
 __pycache__/
 *.py[cod]

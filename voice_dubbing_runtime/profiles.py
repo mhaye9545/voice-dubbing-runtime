@@ -806,7 +806,7 @@ class VoiceProfileManager:
         reference_processing: dict[str, Any],
         target_speaker_window: dict[str, float],
         single_speaker_confirmed: bool,
-        display_name: str = "Lester Holt EN",
+        display_name: str = "English Voice",
     ) -> dict[str, Any]:
         """Commit a validated natural-reference set in one profile revision.
 

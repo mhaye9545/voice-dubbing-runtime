@@ -10,12 +10,14 @@ from pathlib import Path
 from typing import Any
 
 from .capabilities import EngineRegistry
+from .doctor import run_doctor
 from .errors import INVALID_REQUEST, VoiceRuntimeError
 from .io_utils import canonical_json, read_json
 from .media import resolve_ffmpeg
 from .paths import runtime_root
 from .profiles import VoiceProfileManager
 from .repair import KnownProfileRepair, ffmpeg_audio_validator
+from .storage_migration import migrate_storage, storage_status
 from .worker import CancellationToken, MarkerEmitter, VoiceWorker, install_signal_handlers
 
 
@@ -204,6 +206,17 @@ def build_parser() -> argparse.ArgumentParser:
     capability_parser = commands.add_parser("capabilities")
     capability_parser.add_argument("--json", action="store_true", required=True)
 
+    doctor_parser = commands.add_parser("doctor")
+    doctor_parser.add_argument("--json", action="store_true")
+    doctor_parser.add_argument("--deep", action="store_true")
+
+    storage_parser = commands.add_parser("storage")
+    storage_commands = storage_parser.add_subparsers(dest="storage_command", required=True)
+    storage_status_parser = storage_commands.add_parser("status")
+    storage_status_parser.add_argument("--json", action="store_true", required=True)
+    storage_migrate_parser = storage_commands.add_parser("migrate")
+    storage_migrate_parser.add_argument("--json", action="store_true", required=True)
+
     profiles_parser = commands.add_parser("profiles")
     profile_commands = profiles_parser.add_subparsers(dest="profiles_command", required=True)
     list_parser = profile_commands.add_parser("list")
@@ -243,6 +256,25 @@ def main(argv: list[str] | None = None) -> int:
             root = Path(args.runtime_root).resolve() if args.runtime_root else runtime_root()
             _print_json(EngineRegistry(root).as_dict())
             return 0
+        if args.command == "doctor":
+            payload = run_doctor(
+                Path(args.runtime_root).resolve() if args.runtime_root else runtime_root(),
+                deep=args.deep,
+            )
+            if args.json:
+                _print_json(payload)
+            else:
+                for item in payload["checks"]:
+                    print(f"[{item['status']}] {item['group']}.{item['name']}: {item['message']}")
+                print(f"Doctor status: {payload['status']}")
+            return 1 if payload["status"] == "FAIL" else 0
+        if args.command == "storage":
+            if args.storage_command == "status":
+                _print_json(storage_status())
+                return 0
+            payload = migrate_storage()
+            _print_json(payload)
+            return 0 if payload["status"] in {"COMPLETE", "NO_SOURCE"} else 2
         if args.command == "profiles":
             if args.profiles_command == "create-from-source":
                 return _run_create_from_source(args)

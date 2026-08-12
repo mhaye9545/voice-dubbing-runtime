@@ -312,7 +312,7 @@ class SourceSeparationManifestTests(SourceSeparationFixture):
 class SourceSeparationLauncherTests(SourceSeparationFixture):
     def _run(self, *, mode: str, token=None, timeout: float = 5.0):
         requests: list[dict] = []
-        source = self.root / "fixtures" / "Lester H\u1ed3t – tiếng Anh.wav"
+        source = self.root / "fixtures" / "synthetic English voice.wav"
         _write_wav(source)
         output = self.root / "runs" / "kiểm thử" / "ref_voice_only.wav"
         work = self.root / "runs" / "kiểm thử" / "work"
@@ -365,7 +365,7 @@ class SourceSeparationLauncherTests(SourceSeparationFixture):
             "partial demucs stderr",
             json.loads(logs[0].read_text(encoding="utf-8"))["stderr_tail"],
         )
-        self.assertEqual(str(logs[0]), caught.exception.details["diagnostic_log_path"])
+        self.assertTrue(     logs[0].samefile(         Path(caught.exception.details["diagnostic_log_path"])     ) )
 
     def test_timeout_kills_worker_and_cleans_temp(self) -> None:
         with self.assertRaises(VoiceRuntimeError) as caught:
@@ -380,7 +380,7 @@ class SourceSeparationLauncherTests(SourceSeparationFixture):
         self.assertEqual(
             "timeout", json.loads(logs[0].read_text(encoding="utf-8"))["status"]
         )
-        self.assertEqual(str(logs[0]), caught.exception.details["diagnostic_log_path"])
+        self.assertTrue(     logs[0].samefile(         Path(caught.exception.details["diagnostic_log_path"])     ) )
 
     def test_worker_stderr_is_preserved_and_output_not_committed(self) -> None:
         with self.assertRaises(VoiceRuntimeError) as caught:

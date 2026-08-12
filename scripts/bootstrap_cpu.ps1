@@ -1,53 +1,50 @@
 [CmdletBinding()]
-param()
+param(
+    [string]$PythonExecutable = "",
+    [string]$VenvPath = ""
+)
 
 $ErrorActionPreference = "Stop"
 $RuntimeRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
-$Uv = Join-Path $RuntimeRoot ".tools\uv\uv.exe"
-$PythonRoot = Join-Path $RuntimeRoot ".python"
-$Venv = Join-Path $RuntimeRoot ".venv-cpu"
+$Venv = if ($VenvPath) { [System.IO.Path]::GetFullPath($VenvPath) } else { Join-Path $RuntimeRoot ".venv-cpu" }
 $Python = Join-Path $Venv "Scripts\python.exe"
-$Cache = Join-Path $RuntimeRoot ".cache\uv"
+$Lock = Join-Path $RuntimeRoot "requirements-cpu.lock.txt"
 $Vendor = Join-Path $RuntimeRoot "vendor\TTS-ff217b3f27b294de194cc59c5119d1e08b06413c"
-$VendorRequirements = Join-Path $Vendor "requirements.txt"
 
-if (-not (Test-Path -LiteralPath $Uv)) {
-    throw "Local uv is missing: $Uv"
-}
-
-if (-not (Test-Path -LiteralPath $Python)) {
-    & $Uv python install 3.11 --install-dir $PythonRoot --cache-dir $Cache --no-bin --no-registry --managed-python
-    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-
-    $ManagedPython = Get-ChildItem -LiteralPath $PythonRoot -Directory -Filter "cpython-3.11.*-windows-x86_64-none" |
-        Sort-Object Name -Descending |
-        Select-Object -First 1 |
-        ForEach-Object { Join-Path $_.FullName "python.exe" }
-    if (-not $ManagedPython -or -not (Test-Path -LiteralPath $ManagedPython)) {
-        throw "uv-managed Python 3.11 was not found under $PythonRoot"
+function Resolve-Python311([string]$Requested) {
+    $Candidate = if ($Requested) { $Requested } else { (Get-Command python -ErrorAction Stop).Source }
+    if (-not (Test-Path -LiteralPath $Candidate -PathType Leaf)) {
+        throw "Python executable does not exist: $Candidate"
     }
+    $Version = & $Candidate -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')"
+    if ($LASTEXITCODE -ne 0 -or $Version.Trim() -ne "3.11") {
+        throw "Python 3.11 is required; received $Version from $Candidate"
+    }
+    return [System.IO.Path]::GetFullPath($Candidate)
+}
 
-    & $Uv venv $Venv --python $ManagedPython --no-project
+if (-not (Test-Path -LiteralPath $Lock -PathType Leaf)) {
+    throw "CPU lock is missing: $Lock"
+}
+if (-not (Test-Path -LiteralPath (Join-Path $Vendor "TTS\tts\models\xtts.py") -PathType Leaf)) {
+    throw "Pinned vendored TTS source is incomplete: $Vendor"
+}
+
+if (-not (Test-Path -LiteralPath $Python -PathType Leaf)) {
+    $BasePython = Resolve-Python311 $PythonExecutable
+    & $BasePython -m venv $Venv
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 }
 
-if (-not (Test-Path -LiteralPath $VendorRequirements)) {
-    throw "Pinned TTS source is missing: $VendorRequirements"
-}
-
-& $Uv pip install --python $Python --cache-dir $Cache --no-progress `
-    torch==2.6.0 torchaudio==2.6.0 `
-    --index-url "https://download.pytorch.org/whl/cpu"
+& $Python -c "import sys; raise SystemExit(0 if sys.version_info[:2] == (3, 11) else 2)"
+if ($LASTEXITCODE -ne 0) { throw "Existing CPU environment is not Python 3.11: $Python" }
+& $Python -m ensurepip --upgrade
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-
-& $Uv pip install --python $Python --cache-dir $Cache --no-progress `
-    -r $VendorRequirements `
-    "numpy==1.26.4" `
-    "transformers==4.49.0" `
-    "huggingface-hub==0.36.2" `
-    "psutil==7.2.2"
+& $Python -m pip install --require-hashes --no-deps -r $Lock
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 $env:PYTHONPATH = $Vendor
-& $Python -c "import torch, torchaudio; from TTS.tts.models.xtts import Xtts; print(torch.__version__, torchaudio.__version__, 'TTS_IMPORT_PASS')"
-exit $LASTEXITCODE
+& $Python -c "import importlib.metadata as m, pathlib, TTS, torch, torchaudio; names={str(d.metadata.get('Name','')).lower() for d in m.distributions()}; assert 'tts' not in names and 'coqui-tts' not in names; assert not torch.cuda.is_available(); assert pathlib.Path(TTS.__file__).resolve().is_relative_to(pathlib.Path(r'$Vendor').resolve()); from TTS.tts.configs.xtts_config import XttsConfig; from TTS.tts.models.xtts import Xtts; print(torch.__version__, torchaudio.__version__, 'VENDOR_TTS_IMPORT_PASS')"
+$ExitCode = $LASTEXITCODE
+Remove-Item Env:PYTHONPATH -ErrorAction SilentlyContinue
+exit $ExitCode

@@ -24,6 +24,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
 
+from .paths import default_xtts_license_path
+
 
 MARKER = "@@XTTS_ENGINE|"
 MODEL_ID = "coqui/XTTS-v2"
@@ -64,9 +66,7 @@ def _read_json(path: Path) -> Any:
 
 
 def _acceptance_path() -> Path:
-    local = os.environ.get("LOCALAPPDATA")
-    root = Path(local) if local else Path.home() / ".local" / "share"
-    return root / "FrameExtractStudio" / "VoiceDubbing" / "licenses" / "coqui_xtts_v2_cpml.json"
+    return default_xtts_license_path()
 
 
 class XttsStageError(RuntimeError):

@@ -1,10 +1,10 @@
 # Direct Phase 1 CPU probe requirements.
-# TTS transitive requirements are sourced from the pinned upstream archive at
-# vendor/TTS-ff217b3f27b294de194cc59c5119d1e08b06413c/requirements.txt.
-torch==2.6.0
-torchaudio==2.6.0
+# The authoritative TTS source is vendored at the path below. Its transitive
+# dependency declarations come from that tree's requirements.txt.
+# vendor/TTS-ff217b3f27b294de194cc59c5119d1e08b06413c/
+torch @ https://download.pytorch.org/whl/cpu/torch-2.6.0%2Bcpu-cp311-cp311-win_amd64.whl
+torchaudio @ https://download.pytorch.org/whl/cpu/torchaudio-2.6.0%2Bcpu-cp311-cp311-win_amd64.whl
 numpy==1.26.4
 transformers==4.49.0
 huggingface-hub==0.36.2
 psutil==7.2.2
-TTS @ git+https://github.com/thinhlpg/TTS.git@ff217b3f27b294de194cc59c5119d1e08b06413c
