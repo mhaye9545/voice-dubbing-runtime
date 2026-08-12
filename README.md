@@ -1,86 +1,109 @@
 # Voice Dubbing Runtime
 
-> Local, CPU-first voice cloning and speech synthesis runtime designed to become a **standalone application first** and an embeddable runtime later.
+[![CI](https://github.com/akita141188/voice-dubbing-runtime/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/akita141188/voice-dubbing-runtime/actions/workflows/ci.yml)
+![Python](https://img.shields.io/badge/Python-3.11-blue)
+![Platform](https://img.shields.io/badge/Platform-Windows%20x64-lightgrey)
+![License](https://img.shields.io/badge/License-Apache--2.0-green)
+![Contributions](https://img.shields.io/badge/Contributions-welcome-brightgreen)
 
-**Status:** active development / public alpha research preview. First-party code is Apache-2.0.
-**Currently targeted:** Windows x64, Python 3.11.x, CPU.  
-**No commercial-use claim is made for the ML models used or provisioned by this project.**
+> Local, CPU-first voice cloning and speech synthesis runtime with a standalone PySide6 desktop GUI, isolated TTS engines and explicit voice/model license gates.
+
+**Status:** public alpha / active development  
+**Target:** Windows x64, Python 3.11, CPU-first  
+**First-party code:** Apache-2.0  
+**Important:** the current viXTTS/XTTS-v2 model snapshots use separate model terms; open-source code does not automatically grant commercial model or voice rights.
 
 **English** | [Tiếng Việt](README.vi.md)
 
 ---
 
-## Project goal
+## Why this project?
 
-Voice Dubbing Runtime provides an isolated runtime for:
+Voice Dubbing Runtime is being built as a **standalone voice-cloning and dubbing application first**, with a stable runtime contract that other apps can integrate later.
 
-- creating and managing voice profiles from audio/video;
-- selecting short 8–15 second reference segments;
-- optionally separating vocals from background audio;
-- performing deterministic technical reference checks;
-- requiring human listening and explicit approval before committing a new voice-only reference;
-- cloning a voice and synthesizing speech from text;
-- supporting multiple TTS engines behind one runtime contract;
-- isolating incompatible ML stacks in separate Python environments/processes;
-- exposing a CLI/JSON worker protocol for a desktop GUI or other applications.
+The project focuses on a few practical problems that are often mixed together in one fragile ML environment:
 
-The project originated as the isolated Voice Dubbing runtime used by FrameExtract Studio. The next goal is to make it a **standalone open-source desktop application**. FrameExtract Studio should later integrate only through a stable adapter/protocol and must not become a dependency of this repository.
+- creating and managing reusable voice profiles;
+- selecting short 8–15 second voice references from audio/video;
+- optionally separating vocals from background audio with Demucs;
+- requiring technical checks **and human listening approval** before a new reference is committed;
+- synthesizing speech with multiple TTS engines behind one runtime contract;
+- keeping incompatible ML stacks isolated in separate environments/processes;
+- exposing a CLI/JSON worker protocol and a thin PySide6 desktop GUI;
+- running locally and CPU-first instead of requiring a GPU-first deployment.
 
-For the full project description, current implementation details and roadmap in Vietnamese, see **[README.vi.md](README.vi.md)**.
+The runtime originally grew out of the Voice Dubbing work in FrameExtract Studio, but this repository is intentionally standalone. FrameExtract Studio should integrate later through a stable adapter/protocol rather than becoming a dependency here.
 
 ---
 
-## Current implementation
+## What works today
 
-### Runtime and profiles
-
-- `voice_dubbing_runtime/` core package.
-- Capability registry and deterministic engine selection.
-- Voice profile create/update/delete/list flows.
+- Standalone PySide6 GUI in `voice_dubbing_app/`.
+- Voice profile create/list/update/delete flows.
+- Profile revisions, integrity locks and history.
 - Profile-specific voice-rights consent.
-- Profile revisions, integrity locks and update history.
-- Job artifacts: `job.json`, `run.log`, `result.json`.
-- Stable machine-readable markers prefixed with `@@VOICE_DUB|`.
-- Standalone PySide6 thin-client GUI in `voice_dubbing_app/` with profile,
-  reference-review and synthesis workspaces.
-
-### Reference preparation
-
 - FFmpeg source normalization.
 - Automatic or manual 8–15 second reference selection.
-- Two-phase reference update:
+- Two-phase reference workflow:
   - `prepare_profile_reference`;
   - `commit_profile_reference` after listening approval and single-speaker confirmation.
-- Voice-only technical checks for duration, clipping, silence/noise proxies, speech/noise contrast and separation effectiveness.
-- Technical metrics are not presented as speaker diarization and do not replace human listening.
+- Optional Demucs/htdemucs source separation in an isolated environment.
+- `vixtts_vi` CPU runtime for Vietnamese.
+- `xtts_v2_multilingual` isolated runtime with a persistent child worker.
+- Durable job artifacts and machine-readable `@@VOICE_DUB|` progress markers.
+- Safe standalone storage migration from the legacy FrameExtract Studio namespace.
+- Windows/Python 3.11 GitHub Actions CI.
+- Reproducible dev/CPU bootstrap scripts and a read-only `doctor` command.
 
-### Engines
+### Not released yet
 
-`vixtts_vi`
+This is still a **public alpha research/development preview**. There is no end-user installer/portable release yet. Before packaged releases, the project still needs manual desktop acceptance, real-model acceptance and clean-machine packaging tests.
 
-- CPU-only.
-- `.venv-cpu`.
-- `torch==2.6.0`, `torchaudio==2.6.0`.
-- `transformers==4.49.0`.
-- Runtime contract currently advertises Vietnamese (`vi`).
+A visual GUI demo is tracked in [good first issue #5](https://github.com/akita141188/voice-dubbing-runtime/issues/5).
 
-`xtts_v2_multilingual`
+---
 
-- Isolated `.venv-xtts`.
-- `coqui-tts[ko,zh]==0.27.5`.
-- `torch==2.6.0+cpu`, `torchaudio==2.6.0+cpu`.
-- `transformers==4.57.6`.
-- Pinned model: `coqui/XTTS-v2` revision `6c2b0d75eae4b7047358e3b6bd9325f857d43f77`.
-- Capability languages are read from local model configuration.
-- Current development snapshot contains PASS health evidence for `en`, `ko`, and `zh-cn`.
-- Supports a persistent child worker to keep the model loaded between synthesis calls.
+## Quick start for contributors
 
-### Source separation
+### 1. Clone
 
-- Isolated `.venv-source-separation`.
-- `demucs==4.1.0`, `htdemucs`, CPU-only.
-- Pinned runtime/model manifest with file-size and SHA-256 checks before model deserialization.
-- Only the selected short reference candidate is sent to Demucs, not the entire long source video.
+```powershell
+git clone https://github.com/akita141188/voice-dubbing-runtime.git
+cd voice-dubbing-runtime
+```
+
+### 2. Bootstrap the self-contained dev/GUI/test environment
+
+Python 3.11 x64 is required.
+
+```powershell
+& .\scripts\bootstrap_dev.ps1 -PythonExecutable C:\path\to\python.exe
+```
+
+If `python` already points to Python 3.11, `-PythonExecutable` can be omitted.
+
+### 3. Run the GUI
+
+```powershell
+& .\.venv-dev\Scripts\python.exe -m voice_dubbing_app
+```
+
+The GUI is a thin client. Starting it does not silently download or load heavy models.
+
+### 4. Run diagnostics and tests
+
+```powershell
+& .\.venv-dev\Scripts\python.exe -m voice_dubbing_runtime doctor --json
+& .\scripts\run_tests.ps1
+```
+
+### 5. Bootstrap the viXTTS CPU runtime when needed
+
+```powershell
+& .\scripts\bootstrap_cpu.ps1 -PythonExecutable C:\path\to\python.exe
+```
+
+Model weights are provisioned separately after their own license gates; they are not bundled in the source repository.
 
 ---
 
@@ -107,75 +130,35 @@ Standalone Desktop GUI / CLI / external client
      .venv-source-separation              persistent child worker
 ```
 
-The parent runtime intentionally avoids importing every ML dependency directly. Engine-specific stacks run behind subprocess adapters.
+The parent runtime intentionally avoids importing every ML dependency into one process. Engine-specific stacks remain isolated behind subprocess adapters.
 
 ---
 
-## User data and legacy migration
+## Runtime environments
 
-The canonical standalone user-data root on Windows is:
+| Purpose | Environment | Main stack |
+|---|---|---|
+| Dev / GUI / tests | `.venv-dev` | PySide6 + project test/runtime dependencies |
+| Vietnamese TTS | `.venv-cpu` | viXTTS, PyTorch CPU, pinned vendored TTS source |
+| Multilingual XTTS | `.venv-xtts` | `coqui-tts==0.27.5`, XTTS-v2, PyTorch CPU |
+| Source separation | `.venv-source-separation` | Demucs/htdemucs, PyTorch CPU |
 
-```text
-%LOCALAPPDATA%\VoiceDubbingRuntime\
-```
-
-Existing data under `%LOCALAPPDATA%\FrameExtractStudio\VoiceDubbing\` is
-supported through a safe migration and fallback contract. Check status and run
-the explicit migration with:
-
-```powershell
-& .\.venv-dev\Scripts\python.exe -m voice_dubbing_runtime storage status --json
-& .\.venv-dev\Scripts\python.exe -m voice_dubbing_runtime storage migrate --json
-```
-
-Migration copies `profiles`, `runs`, `licenses`, `config` and `state` when
-present, verifies every copied file with SHA-256, then writes a completion
-marker. It never moves, renames, deletes or overwrites the legacy source. Until
-verification completes, the runtime continues to use the legacy store as a
-fallback so existing profiles remain available.
+Provisioning scripts intentionally keep model download/license acceptance separate from the base bootstrap.
 
 ---
 
-## Contributor setup (Windows)
-
-Python 3.11 x64 is required. Both bootstrap scripts accept
-`-PythonExecutable <path>`; otherwise they use the current `python` command and
-fail clearly unless it is Python 3.11. Existing environments are never deleted.
-
-```powershell
-# Self-contained GUI/dev/test environment (no cross-venv PYTHONPATH)
-& .\scripts\bootstrap_dev.ps1 -PythonExecutable C:\path\to\python.exe
-
-# Isolated viXTTS CPU environment using the hashed CPU lock and vendored TTS
-& .\scripts\bootstrap_cpu.ps1 -PythonExecutable C:\path\to\python.exe
-
-# Read-only diagnostics; --deep additionally imports the XTTS classes
-& .\.venv-dev\Scripts\python.exe -m voice_dubbing_runtime doctor --json
-& .\.venv-cpu\Scripts\python.exe -m voice_dubbing_runtime doctor --deep
-```
-
-The base bootstraps do not download models. XTTS-v2 and Demucs remain isolated
-and are provisioned explicitly with `scripts/provision_xtts_v2.py` and
-`scripts/provision_demucs_htdemucs.py` after their respective license gates.
-
----
-
-## CLI contract
+## CLI / worker contract
 
 ```powershell
 & .\.venv-cpu\Scripts\python.exe -u -m voice_dubbing_runtime capabilities --json
 & .\.venv-cpu\Scripts\python.exe -u -m voice_dubbing_runtime profiles list --json
-& .\.venv-cpu\Scripts\python.exe -u -m voice_dubbing_runtime profiles create --request <request.json> --json
-& .\.venv-cpu\Scripts\python.exe -u -m voice_dubbing_runtime profiles create-from-source --request <request.json>
-& .\.venv-cpu\Scripts\python.exe -u -m voice_dubbing_runtime profiles update --request <request.json> --json
-& .\.venv-cpu\Scripts\python.exe -u -m voice_dubbing_runtime profiles consent --request <request.json> --json
 & .\.venv-dev\Scripts\python.exe -m voice_dubbing_runtime storage status --json
 & .\.venv-dev\Scripts\python.exe -m voice_dubbing_runtime storage migrate --json
 & .\.venv-cpu\Scripts\python.exe -u -m voice_dubbing_runtime worker --job <job.json>
 & .\.venv-cpu\Scripts\python.exe -u -m voice_dubbing_runtime worker --jobs-jsonl <jobs.jsonl>
 ```
 
-Worker actions currently supported:
+Current worker actions:
 
 ```text
 create_profile
@@ -184,226 +167,99 @@ commit_profile_reference
 synthesize
 ```
 
----
-
-## Standalone GUI (development)
-
-Bootstrap the self-contained development environment, then run the GUI:
-
-```powershell
-& .\scripts\bootstrap_dev.ps1
-& .\.venv-dev\Scripts\python.exe -m voice_dubbing_app
-```
-
-The GUI is a thin client. Startup performs capability discovery and profile
-inventory only; it does not load or download a model. Heavy jobs are sent to
-the existing `.venv-cpu` JSONL worker, and engine-specific ML stacks remain in
-their isolated runtime processes.
-
----
-
-## Verification
-
-Run the complete suite in the self-contained development environment:
-
-```powershell
-& .\scripts\run_tests.ps1
-```
-
-Check environments:
-
-```powershell
-& .\.venv-dev\Scripts\python.exe -m pip check
-& .\.venv-cpu\Scripts\python.exe -m pip check
-& .\.venv-xtts\Scripts\python.exe -m pip check
-& .\.venv-source-separation\Scripts\python.exe -m pip check
-```
-
----
-
-## Model licenses and voice consent
-
-Voice-rights consent is profile-specific and separate from model-license acceptance.
-
-The viXTTS and XTTS-v2 model snapshots currently used by the development runtime declare the **Coqui Public Model License 1.0.0 (CPML)** with non-commercial scope. Therefore, open-sourcing this project's code does **not** grant commercial rights to those model weights or their use.
-
-The current source-separation manifest declares Demucs/htdemucs under the MIT license. The repository also contains vendored TTS source under Mozilla Public License 2.0.
-
-First-party project source is licensed under Apache License 2.0 (`Apache-2.0`).
-See [LICENSE](LICENSE), [LICENSE_STATUS.md](LICENSE_STATUS.md),
-[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) and
-[docs/MODEL_LICENSES.md](docs/MODEL_LICENSES.md).
-
-Heavy runtimes and model weights are provisioned separately after explicit
-license gates. Users must review the current model terms themselves;
-Apache-2.0 does not grant model, weights/data, output or voice rights.
+The runtime uses machine-readable markers prefixed with:
 
 ```text
-CODE LICENSE != MODEL LICENSE != WEIGHTS/DATA/VOICE RIGHTS
+@@VOICE_DUB|
 ```
-
-Community policies are in [CONTRIBUTING.md](CONTRIBUTING.md),
-[SECURITY.md](SECURITY.md) and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
 
 ---
 
-## Release follow-up gates
+## Storage and backward compatibility
 
-Source readiness does not imply production/release acceptance. Before publishing
-a packaged release, the project still needs:
+The canonical standalone Windows data root is:
 
-- manual desktop and real-model acceptance for the standalone GUI;
-- clean-machine packaging and release tests.
+```text
+%LOCALAPPDATA%\VoiceDubbingRuntime\
+```
+
+Legacy data under `%LOCALAPPDATA%\FrameExtractStudio\VoiceDubbing\` is supported through a copy + SHA-256 verification migration with legacy fallback. The migration does not move, rename or delete the legacy source store.
+
+---
+
+## Contributing
+
+Contributions are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md) and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) first.
+
+Canonical contribution flow:
+
+```text
+fork / feature branch
+        ↓
+pull request into develop
+        ↓
+Windows/Python 3.11 CI + review
+        ↓
+merge into develop
+        ↓
+owner release review
+        ↓
+develop → main
+```
+
+**Do not open contributor PRs directly against `main`.**
+
+Good places to start:
+
+- [#5 — Add standalone GUI screenshots and a short demo GIF](https://github.com/akita141188/voice-dubbing-runtime/issues/5) — `good first issue`, documentation/UI.
+- [#6 — Centralize Windows path-equivalence assertions for CI](https://github.com/akita141188/voice-dubbing-runtime/issues/6) — `good first issue`, tests.
+- [#7 — Add a small public Python API](https://github.com/akita141188/voice-dubbing-runtime/issues/7) — `help wanted`, API design.
+
+Browse all [open issues](https://github.com/akita141188/voice-dubbing-runtime/issues) or join [GitHub Discussions](https://github.com/akita141188/voice-dubbing-runtime/discussions) for questions, ideas and roadmap conversations.
 
 ---
 
 ## Roadmap
 
-### Phase 0 — Open-source cleanup and repository hardening **(current)**
+Near-term priorities:
 
-- Documentation and architecture refresh.
-- Version synchronization at `0.3.0`.
-- Apache-2.0 root license with separate third-party/model/data/voice boundaries.
-- Remove model weights from source distribution.
-- Clean up test-persona/evidence scripts.
-- Maintain the standalone storage namespace and verified legacy migration.
-- Maintain Windows/Python 3.11 CI with required check `windows-python311`.
+1. Add screenshots/demo media and improve first-run UX.
+2. Stabilize the public runtime/API surface.
+3. Improve reference candidate ranking and quality evaluation.
+4. Add dubbing workflow features: segment/subtitle input, batch synthesis, timing adaptation and track assembly.
+5. Build a clean Windows packaging/release pipeline.
+6. Integrate FrameExtract Studio only after the standalone runtime/API is stable.
 
-### Phase 1 — Reproducible runtime bootstrap
+The project remains CPU-first and keeps model provisioning separate from the source distribution.
 
-- Public bootstrap commands for clean `.venv-dev` and `.venv-cpu` environments.
-- Hash-locked, CPU-only dev and viXTTS dependency installations.
-- FFmpeg verification.
-- Explicit model-license gates and model provisioning.
-- Read-only `doctor` command for runtime/model/dependency health.
+---
 
-### Phase 2 — Standalone desktop GUI
+## License, models and voice rights
 
-The first thin-client implementation is now present in source. Offscreen GUI
-tests cover runtime marker parsing, profile create/update state isolation,
-manual-review commit gates and synthesis capability filtering. Normal desktop
-UX and real-model acceptance are still required before a release claim.
+First-party source is licensed under **Apache License 2.0**. See [LICENSE](LICENSE).
 
-First GUI scope:
+Third-party source and models keep their own terms:
 
-- choose audio/video source;
-- select target-speaker window;
-- auto/manual 8–15 second reference;
-- optional source separation;
-- A/B listen to source mix vs voice-only candidate;
-- explicit consent and single-speaker confirmation;
-- create/update/delete voice profiles;
-- enter text/language/engine/speed;
-- synthesize, preview and save WAV;
-- progress, cancellation and diagnostic logs.
+- vendored TTS source: MPL-2.0;
+- Demucs: MIT according to the pinned project evidence;
+- current viXTTS and XTTS-v2 model snapshots: CPML with non-commercial scope according to the pinned model evidence;
+- PySide6/Qt and other dependencies: their respective third-party terms.
 
-The GUI must remain a thin client. ML and business logic stay in the runtime.
-
-### Phase 3 — Runtime/API stabilization
-
-- Version job/result schemas.
-- Separate public runtime API from debug/migration tools.
-- Stabilize progress events and error codes.
-- Define profile-schema migration policy.
-- Add a small public Python API alongside the CLI/JSON protocol.
-
-### Phase 4 — Voice/reference quality
-
-- Better candidate ranking for long media.
-- GUI A/B candidate comparison.
-- Optional separation/denoise adapters.
-- CPU time/RAM benchmarks.
-- Licensed quality-regression fixtures.
-
-Human listening remains a required authority for audible background/speaker suitability.
-
-### Phase 5 — Dubbing workflow
-
-After single-utterance cloning is stable:
-
-- segment/subtitle input;
-- batch synthesis;
-- timing/duration adaptation;
-- dubbing-track assembly;
-- video preview;
-- audio export or video muxing;
-- optional ASR/translation modules without forcing them into the core runtime.
-
-### Phase 6 — Packaging and public release
-
-- Windows desktop build.
-- Separate model provisioner/downloader.
-- No restricted model bundling without permission.
-- Checksums/signing policy.
-- Clean-machine smoke test.
-- Contributor documentation.
-
-### Phase 7 — FrameExtract Studio integration
-
-Only after the standalone runtime/API is stable:
+See [LICENSE_STATUS.md](LICENSE_STATUS.md), [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) and [docs/MODEL_LICENSES.md](docs/MODEL_LICENSES.md).
 
 ```text
-FrameExtract Studio
-        |
-        v
-Voice Dubbing Adapter
-        |
-        v
-stable Voice Dubbing Runtime protocol
+CODE LICENSE != MODEL LICENSE != WEIGHTS/DATA/VOICE RIGHTS
 ```
 
-This repository must not depend on FrameExtract Studio.
+Voice cloning can produce audio resembling a real person. Users and contributors are responsible for the rights and consent required for reference voices, generated content and intended use.
 
 ---
 
-## Development principles
+## Community
 
-1. Standalone first, embeddable later.
-2. Core/runtime does not depend on the GUI.
-3. FrameExtract Studio is a client, not a dependency.
-4. Keep incompatible ML stacks isolated.
-5. Capability discovery must not silently download models.
-6. Pin model revisions and verify integrity before loading.
-7. Do not silently overwrite profiles, references or run artifacts.
-8. Voice-rights consent and model-license acceptance are separate gates.
-9. Technical quality metrics do not replace human listening.
-10. Do not commit private voice samples, user-generated audio or model weights to the public source repository.
+- [Issues](https://github.com/akita141188/voice-dubbing-runtime/issues) — bugs and scoped engineering work.
+- [Discussions](https://github.com/akita141188/voice-dubbing-runtime/discussions) — questions, ideas, feedback and roadmap conversations.
+- [Security policy](SECURITY.md) — vulnerability reporting guidance.
+- [Contributing guide](CONTRIBUTING.md) — development workflow and PR requirements.
 
----
-
-## Current source layout
-
-```text
-voice-dubbing-runtime/
-├── voice_dubbing_runtime/
-│   ├── capabilities.py
-│   ├── cli.py
-│   ├── media.py
-│   ├── profiles.py
-│   ├── reference_quality.py
-│   ├── source_separation.py
-│   ├── source_separation_worker.py
-│   ├── vixtts_backend.py
-│   ├── worker.py
-│   ├── xtts_backend.py
-│   ├── xtts_engine_worker.py
-│   └── config/engines.json
-├── scripts/
-├── tests/
-├── vendor/
-├── requirements-cpu.txt
-├── requirements-xtts.in.txt
-├── requirements-xtts.lock.txt
-├── requirements-source-separation.in.txt
-├── requirements-source-separation.lock.txt
-├── pyproject.toml
-└── uv.lock
-```
-
----
-
-## Disclaimer
-
-Voice cloning can produce audio resembling a real person's voice. Users are responsible for obtaining the rights and consent required for the reference voice, generated content and intended use.
-
-This project is currently a research/development preview. It makes no warranty regarding production suitability, output quality, model commercial rights, or rights to any person's voice.
+If the project is useful to you, testing it, opening a focused issue, contributing a PR, sharing it with other developers, or starring the repository all help the project grow.
