@@ -190,29 +190,30 @@ class KnownProfileRepairTests(unittest.TestCase):
         self.assertFalse((self.profiles / "duc_bao").exists())
         self.assertEqual([], list(self.profiles.glob(".profile-repair-txn-*")))
 
-    def test_commit_failure_restores_original_profile_after_pre_repair_snapshot(self) -> None:
-        before = data_hashes(self.profiles)
-        real_rename = os.rename
+def test_commit_failure_restores_original_profile_after_pre_repair_snapshot(self) -> None:
+    before = data_hashes(self.profiles)
+    real_rename = os.rename
 
-        def fail_duc_commit(source: str | Path, destination: str | Path) -> None:
-            source_path = Path(source)
-            destination_path = Path(destination)
-            if (
-                destination_path == self.profiles / "duc_bao"
-                and source_path.name == "duc_bao"
-                and ".profile-repair-txn-" in source_path.as_posix()
-            ):
-                raise OSError("injected failure after Lụa commit")
-            real_rename(source, destination)
+    def fail_duc_commit(source: str | Path, destination: str | Path) -> None:
+        source_path = Path(source)
+        destination_path = Path(destination)
+        if (
+            destination_path == self.manager.root / "duc_bao"
+            and source_path.name == "duc_bao"
+            and source_path.parent.name == "profiles"
+            and source_path.parent.parent.name.startswith(".profile-repair-txn-")
+        ):
+            raise OSError("injected failure after Lụa commit")
+        real_rename(source, destination)
 
-        with mock.patch("voice_dubbing_runtime.repair.os.rename", side_effect=fail_duc_commit):
-            with self.assertRaisesRegex(OSError, "injected failure"):
-                self.service.execute(application_closed_confirmed=True)
+    with mock.patch("voice_dubbing_runtime.repair.os.rename", side_effect=fail_duc_commit):
+        with self.assertRaisesRegex(OSError, "injected failure"):
+            self.service.execute(application_closed_confirmed=True)
 
-        self.assertEqual(before, data_hashes(self.profiles))
-        self.assertFalse((self.profiles / "duc_bao").exists())
-        self.assertEqual([], list(self.profiles.glob(".lua_china_base.pre-repair-*")))
-        self.assertEqual([], list(self.profiles.glob(".profile-repair-txn-*")))
+    self.assertEqual(before, data_hashes(self.profiles))
+    self.assertFalse((self.profiles / "duc_bao").exists())
+    self.assertEqual([], list(self.profiles.glob(".lua_china_base.pre-repair-*")))
+    self.assertEqual([], list(self.profiles.glob(".profile-repair-txn-*")))
 
     def test_migrate_legacy_is_idempotent(self) -> None:
         first = self.manager.migrate_legacy(
