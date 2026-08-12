@@ -2,7 +2,7 @@
 
 > Local, CPU-first voice cloning and speech synthesis runtime designed to become a **standalone application first** and an embeddable runtime later.
 
-**Status:** active development / research preview.  
+**Status:** active development / public alpha research preview. First-party code is Apache-2.0.
 **Currently targeted:** Windows x64, Python 3.11.x, CPU.  
 **No commercial-use claim is made for the ML models used or provisioned by this project.**
 
@@ -41,6 +41,8 @@ For the full project description, current implementation details and roadmap in 
 - Profile revisions, integrity locks and update history.
 - Job artifacts: `job.json`, `run.log`, `result.json`.
 - Stable machine-readable markers prefixed with `@@VOICE_DUB|`.
+- Standalone PySide6 thin-client GUI in `voice_dubbing_app/` with profile,
+  reference-review and synthesis workspaces.
 
 ### Reference preparation
 
@@ -85,7 +87,7 @@ For the full project description, current implementation details and roadmap in 
 ## Architecture
 
 ```text
-CLI / future Desktop GUI / external client
+Standalone Desktop GUI / CLI / external client
                 |
                 v
       voice_dubbing_runtime
@@ -109,6 +111,55 @@ The parent runtime intentionally avoids importing every ML dependency directly. 
 
 ---
 
+## User data and legacy migration
+
+The canonical standalone user-data root on Windows is:
+
+```text
+%LOCALAPPDATA%\VoiceDubbingRuntime\
+```
+
+Existing data under `%LOCALAPPDATA%\FrameExtractStudio\VoiceDubbing\` is
+supported through a safe migration and fallback contract. Check status and run
+the explicit migration with:
+
+```powershell
+& .\.venv-dev\Scripts\python.exe -m voice_dubbing_runtime storage status --json
+& .\.venv-dev\Scripts\python.exe -m voice_dubbing_runtime storage migrate --json
+```
+
+Migration copies `profiles`, `runs`, `licenses`, `config` and `state` when
+present, verifies every copied file with SHA-256, then writes a completion
+marker. It never moves, renames, deletes or overwrites the legacy source. Until
+verification completes, the runtime continues to use the legacy store as a
+fallback so existing profiles remain available.
+
+---
+
+## Contributor setup (Windows)
+
+Python 3.11 x64 is required. Both bootstrap scripts accept
+`-PythonExecutable <path>`; otherwise they use the current `python` command and
+fail clearly unless it is Python 3.11. Existing environments are never deleted.
+
+```powershell
+# Self-contained GUI/dev/test environment (no cross-venv PYTHONPATH)
+& .\scripts\bootstrap_dev.ps1 -PythonExecutable C:\path\to\python.exe
+
+# Isolated viXTTS CPU environment using the hashed CPU lock and vendored TTS
+& .\scripts\bootstrap_cpu.ps1 -PythonExecutable C:\path\to\python.exe
+
+# Read-only diagnostics; --deep additionally imports the XTTS classes
+& .\.venv-dev\Scripts\python.exe -m voice_dubbing_runtime doctor --json
+& .\.venv-cpu\Scripts\python.exe -m voice_dubbing_runtime doctor --deep
+```
+
+The base bootstraps do not download models. XTTS-v2 and Demucs remain isolated
+and are provisioned explicitly with `scripts/provision_xtts_v2.py` and
+`scripts/provision_demucs_htdemucs.py` after their respective license gates.
+
+---
+
 ## CLI contract
 
 ```powershell
@@ -118,6 +169,8 @@ The parent runtime intentionally avoids importing every ML dependency directly. 
 & .\.venv-cpu\Scripts\python.exe -u -m voice_dubbing_runtime profiles create-from-source --request <request.json>
 & .\.venv-cpu\Scripts\python.exe -u -m voice_dubbing_runtime profiles update --request <request.json> --json
 & .\.venv-cpu\Scripts\python.exe -u -m voice_dubbing_runtime profiles consent --request <request.json> --json
+& .\.venv-dev\Scripts\python.exe -m voice_dubbing_runtime storage status --json
+& .\.venv-dev\Scripts\python.exe -m voice_dubbing_runtime storage migrate --json
 & .\.venv-cpu\Scripts\python.exe -u -m voice_dubbing_runtime worker --job <job.json>
 & .\.venv-cpu\Scripts\python.exe -u -m voice_dubbing_runtime worker --jobs-jsonl <jobs.jsonl>
 ```
@@ -133,24 +186,37 @@ synthesize
 
 ---
 
-## Verification
+## Standalone GUI (development)
 
-The repository currently contains **80 unit/contract test cases** covering capabilities, CLI, media handling, profile robustness, reference flow, source separation, worker behavior and XTTS contracts.
-
-Run tests with the project's pinned Python 3.11 environment:
+Bootstrap the self-contained development environment, then run the GUI:
 
 ```powershell
-$env:PYTHONDONTWRITEBYTECODE = "1"
-$env:PYTHONUTF8 = "1"
-& .\.venv-cpu\Scripts\python.exe -m unittest discover -s tests -t . -p "test_*.py" -v
+& .\scripts\bootstrap_dev.ps1
+& .\.venv-dev\Scripts\python.exe -m voice_dubbing_app
+```
+
+The GUI is a thin client. Startup performs capability discovery and profile
+inventory only; it does not load or download a model. Heavy jobs are sent to
+the existing `.venv-cpu` JSONL worker, and engine-specific ML stacks remain in
+their isolated runtime processes.
+
+---
+
+## Verification
+
+Run the complete suite in the self-contained development environment:
+
+```powershell
+& .\scripts\run_tests.ps1
 ```
 
 Check environments:
 
 ```powershell
-& .\.tools\uv\uv.exe pip check --python .\.venv-cpu\Scripts\python.exe
-& .\.tools\uv\uv.exe pip check --python .\.venv-xtts\Scripts\python.exe
-& .\.tools\uv\uv.exe pip check --python .\.venv-source-separation\Scripts\python.exe
+& .\.venv-dev\Scripts\python.exe -m pip check
+& .\.venv-cpu\Scripts\python.exe -m pip check
+& .\.venv-xtts\Scripts\python.exe -m pip check
+& .\.venv-source-separation\Scripts\python.exe -m pip check
 ```
 
 ---
@@ -163,23 +229,30 @@ The viXTTS and XTTS-v2 model snapshots currently used by the development runtime
 
 The current source-separation manifest declares Demucs/htdemucs under the MIT license. The repository also contains vendored TTS source under Mozilla Public License 2.0.
 
-The root source-code license for this project has **not yet been finalized**. A dependency/license audit and third-party notices are required before the first public release.
+First-party project source is licensed under Apache License 2.0 (`Apache-2.0`).
+See [LICENSE](LICENSE), [LICENSE_STATUS.md](LICENSE_STATUS.md),
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) and
+[docs/MODEL_LICENSES.md](docs/MODEL_LICENSES.md).
+
+Heavy runtimes and model weights are provisioned separately after explicit
+license gates. Users must review the current model terms themselves;
+Apache-2.0 does not grant model, weights/data, output or voice rights.
+
+```text
+CODE LICENSE != MODEL LICENSE != WEIGHTS/DATA/VOICE RIGHTS
+```
+
+Community policies are in [CONTRIBUTING.md](CONTRIBUTING.md),
+[SECURITY.md](SECURITY.md) and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
 
 ---
 
-## Public-release blockers
+## Release follow-up gates
 
-Before calling the project public-ready, the current repository still needs:
+Source readiness does not imply production/release acceptance. Before publishing
+a packaged release, the project still needs:
 
-- version synchronization (`pyproject.toml` vs runtime `0.3.0` contract);
-- a root source-code license and `THIRD_PARTY_NOTICES.md`;
-- cleanup of one-off/debug scripts tied to specific test profiles;
-- a generic standalone user-data namespace instead of the legacy FrameExtract Studio path;
-- a reproducible bootstrap for all three Python environments;
-- a `doctor`/health-check command;
-- Windows CI on Python 3.11;
-- a policy for vendored TTS source;
-- a standalone GUI;
+- manual desktop and real-model acceptance for the standalone GUI;
 - clean-machine packaging and release tests.
 
 ---
@@ -189,22 +262,27 @@ Before calling the project public-ready, the current repository still needs:
 ### Phase 0 — Open-source cleanup and repository hardening **(current)**
 
 - Documentation and architecture refresh.
-- Version synchronization.
-- Source-code license audit and third-party notices.
+- Version synchronization at `0.3.0`.
+- Apache-2.0 root license with separate third-party/model/data/voice boundaries.
 - Remove model weights from source distribution.
 - Clean up test-persona/evidence scripts.
-- Decouple runtime storage namespace from FrameExtract Studio.
-- Add Windows/Python 3.11 CI.
+- Maintain the standalone storage namespace and verified legacy migration.
+- Maintain Windows/Python 3.11 CI with required check `windows-python311`.
 
 ### Phase 1 — Reproducible runtime bootstrap
 
-- One bootstrap command for a clean Windows machine.
-- Reproducible `.venv-cpu`, `.venv-xtts`, `.venv-source-separation` setup.
+- Public bootstrap commands for clean `.venv-dev` and `.venv-cpu` environments.
+- Hash-locked, CPU-only dev and viXTTS dependency installations.
 - FFmpeg verification.
 - Explicit model-license gates and model provisioning.
-- `doctor` command for runtime/model/dependency health.
+- Read-only `doctor` command for runtime/model/dependency health.
 
 ### Phase 2 — Standalone desktop GUI
+
+The first thin-client implementation is now present in source. Offscreen GUI
+tests cover runtime marker parsing, profile create/update state isolation,
+manual-review commit gates and synthesis capability filtering. Normal desktop
+UX and real-model acceptance are still required before a release claim.
 
 First GUI scope:
 

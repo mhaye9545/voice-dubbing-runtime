@@ -1,6 +1,6 @@
 [project]
 name = "voice-dubbing-runtime"
-version = "0.1.0"
+version = "0.3.0"
 description = "Isolated CPU-only Voice Dubbing Phase 1 research probe"
 requires-python = ">=3.11,<3.12"
 dependencies = [
@@ -10,8 +10,29 @@ dependencies = [
     "torch==2.6.0",
     "torchaudio==2.6.0",
     "transformers==4.49.0",
-    "TTS @ git+https://github.com/thinhlpg/TTS.git@ff217b3f27b294de194cc59c5119d1e08b06413c",
 ]
+
+[project.optional-dependencies]
+gui = [
+    "PySide6>=6,<7",
+]
+
+[tool.setuptools.packages.find]
+include = [
+    "voice_dubbing_runtime*",
+    "voice_dubbing_app*",
+]
+exclude = [
+    "tests*",
+    "runs*",
+    "models*",
+    "vendor*",
+    "compat_backup*",
+    "scripts*",
+]
+
+[tool.setuptools.package-data]
+voice_dubbing_runtime = ["config/*.json"]
 
 [[tool.uv.index]]
 name = "pytorch-cpu"

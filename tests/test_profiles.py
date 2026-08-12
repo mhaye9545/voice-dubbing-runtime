@@ -20,16 +20,16 @@ class VoiceProfileManagerTests(unittest.TestCase):
         self.temporary = tempfile.TemporaryDirectory()
         self.base = Path(self.temporary.name)
         self.manager = VoiceProfileManager(self.base / "profiles")
-        self.reference = write_pcm_wav(self.base / "nguồn giọng" / "Lụa mẫu.wav")
+        self.reference = write_pcm_wav(self.base / "nguồn giọng" / "giọng mẫu.wav")
         self.consent = {"confirmed": True, "statement": "Tôi có quyền sử dụng giọng nói này."}
 
     def tearDown(self) -> None:
         self.temporary.cleanup()
 
-    def create_cloned(self, profile_id: str = "lua_china_base") -> dict:
+    def create_cloned(self, profile_id: str = "sample_voice") -> dict:
         return self.manager.create(
             profile_id=profile_id,
-            display_name="Lụa ở China",
+            display_name="Sample Voice",
             profile_type="cloned",
             source_type="audio",
             default_language="vi",
@@ -46,11 +46,11 @@ class VoiceProfileManagerTests(unittest.TestCase):
         for relative in ("profile.json", "quality.json", "consent.json", "profile.lock"):
             self.assertTrue((directory / relative).is_file(), relative)
         self.assertTrue((directory / profile["reference_files"][0]["path"]).is_file())
-        self.assertEqual(profile, self.manager.load("lua_china_base"))
+        self.assertEqual(profile, self.manager.load("sample_voice"))
 
     def test_unicode_source_path_round_trips_and_copy_hash_is_verified(self) -> None:
         self.create_cloned()
-        resolved = self.manager.resolve_references("lua_china_base")
+        resolved = self.manager.resolve_references("sample_voice")
         self.assertEqual(1, len(resolved))
         self.assertGreater(resolved[0].stat().st_size, 0)
 
@@ -99,36 +99,36 @@ class VoiceProfileManagerTests(unittest.TestCase):
 
     def test_consent_record_must_match_profile_id(self) -> None:
         self.create_cloned()
-        path = self.manager.root / "lua_china_base" / "consent.json"
+        path = self.manager.root / "sample_voice" / "consent.json"
         payload = json.loads(path.read_text(encoding="utf-8"))
         payload["profile_id"] = "another_profile"
         path.write_text(json.dumps(payload), encoding="utf-8")
         with self.assertRaises(VoiceRuntimeError) as context:
-            self.manager.consent("lua_china_base")
+            self.manager.consent("sample_voice")
         self.assertEqual(CONSENT_REQUIRED, context.exception.code)
 
     def test_duplicate_profile_never_overwrites(self) -> None:
         original = self.create_cloned()
         duplicate = self.create_cloned()
-        self.assertEqual("lua_china_base_2", duplicate["profile_id"])
-        self.assertEqual(original, self.manager.load("lua_china_base"))
-        self.assertEqual(duplicate, self.manager.load("lua_china_base_2"))
+        self.assertEqual("sample_voice_2", duplicate["profile_id"])
+        self.assertEqual(original, self.manager.load("sample_voice"))
+        self.assertEqual(duplicate, self.manager.load("sample_voice_2"))
 
     def test_update_reference_preserves_prior_file_and_reuses_consent(self) -> None:
         original = self.create_cloned()
-        old_path = self.manager.root / "lua_china_base" / original["reference_files"][0]["path"]
+        old_path = self.manager.root / "sample_voice" / original["reference_files"][0]["path"]
         replacement = write_pcm_wav(self.base / "新的参考.wav", frequency=260.0)
         updated = self.manager.update(
-            "lua_china_base",
+            "sample_voice",
             display_name="Tên mới",
             reference_files=[replacement],
         )
-        new_path = self.manager.root / "lua_china_base" / updated["reference_files"][0]["path"]
+        new_path = self.manager.root / "sample_voice" / updated["reference_files"][0]["path"]
         self.assertEqual("Tên mới", updated["display_name"])
         self.assertTrue(old_path.is_file())
         self.assertTrue(new_path.is_file())
         self.assertNotEqual(old_path, new_path)
-        self.assertTrue(self.manager.consent("lua_china_base")["authorized"])
+        self.assertTrue(self.manager.consent("sample_voice")["authorized"])
 
     def test_migrate_legacy_profile_preserves_phase1_evidence(self) -> None:
         profile_dir = self.manager.root / "lua_china_base"
@@ -198,20 +198,42 @@ class VoiceProfileManagerTests(unittest.TestCase):
 
     def test_tampered_reference_is_rejected(self) -> None:
         profile = self.create_cloned()
-        path = self.manager.root / "lua_china_base" / profile["reference_files"][0]["path"]
+        path = self.manager.root / "sample_voice" / profile["reference_files"][0]["path"]
         with path.open("ab") as handle:
             handle.write(b"tamper")
         with self.assertRaises(VoiceRuntimeError) as context:
-            self.manager.resolve_references("lua_china_base")
+            self.manager.resolve_references("sample_voice")
         self.assertEqual(INVALID_REFERENCE, context.exception.code)
 
     def test_list_and_recoverable_delete(self) -> None:
         self.create_cloned()
-        self.assertEqual(["lua_china_base"], [item["profile_id"] for item in self.manager.list()])
-        deleted = self.manager.delete("lua_china_base")
+        self.assertEqual(["sample_voice"], [item["profile_id"] for item in self.manager.list()])
+        deleted = self.manager.delete("sample_voice")
         self.assertEqual("deleted", deleted["status"])
         self.assertTrue(Path(deleted["recoverable_path"]).is_dir())
         self.assertEqual([], self.manager.list())
+
+    def test_legacy_lester_profile_id_round_trips_without_display_name_contract(self) -> None:
+        created = self.manager.create(
+            profile_id="lestehrolt_en_clean",
+            display_name="Synthetic English Profile",
+            profile_type="cloned",
+            source_type="audio",
+            source_language="en",
+            default_language="en",
+            engine_preference="xtts_v2_multilingual",
+            reference_files=[self.reference],
+            consent=self.consent,
+        )
+        self.assertEqual("lestehrolt_en_clean", created["profile_id"])
+        self.assertEqual(
+            "Synthetic English Profile",
+            self.manager.load("lestehrolt_en_clean")["display_name"],
+        )
+        self.assertEqual(1, self.manager.profile_revision("lestehrolt_en_clean"))
+        listed = {row["profile_id"]: row for row in self.manager.list()}
+        self.assertEqual({"lestehrolt_en_clean"}, set(listed))
+        self.assertEqual("READY", listed["lestehrolt_en_clean"]["profile_status"])
 
 
 if __name__ == "__main__":

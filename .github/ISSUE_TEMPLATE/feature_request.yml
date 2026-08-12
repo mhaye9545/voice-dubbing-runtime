@@ -1,0 +1,26 @@
+name: Feature request
+description: Đề xuất cải tiến cho public alpha.
+title: "[Feature]: "
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Use case hoặc vấn đề
+      description: Mô tả nhu cầu mà không đính kèm dữ liệu/recording riêng tư.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Giải pháp đề xuất
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Phương án khác đã cân nhắc
+  - type: textarea
+    id: compatibility
+    attributes:
+      label: Tác động compatibility, license hoặc model/data/voice rights
+      description: Nêu dependency/third-party material nếu đề xuất cần thêm chúng.

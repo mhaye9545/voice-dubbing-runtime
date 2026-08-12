@@ -56,11 +56,11 @@ class ProfileRobustnessTests(unittest.TestCase):
 
     def test_collision_ids_increment_without_overwrite(self) -> None:
         identifiers = [
-            self.create("Đức Bảo", "duc_bao", self.reference_a)["profile_id"],
-            self.create("Đức Bảo", "duc_bao", self.reference_b)["profile_id"],
-            self.create("Đức Bảo", "duc_bao", self.reference_a)["profile_id"],
+            self.create("Sample Voice", "sample_voice", self.reference_a)["profile_id"],
+            self.create("Sample Voice", "sample_voice", self.reference_b)["profile_id"],
+            self.create("Sample Voice", "sample_voice", self.reference_a)["profile_id"],
         ]
-        self.assertEqual(["duc_bao", "duc_bao_2", "duc_bao_3"], identifiers)
+        self.assertEqual(["sample_voice", "sample_voice_2", "sample_voice_3"], identifiers)
 
     def test_source_language_is_independent_schema_field(self) -> None:
         profile = self.manager.create(
@@ -200,7 +200,7 @@ class ProfileRobustnessTests(unittest.TestCase):
         self.assertEqual(2, result["profile_revision"])
         loaded = self.manager.load("profile_a")
         self.assertEqual("READY", loaded["status"])
-        self.assertEqual("Lester Holt EN", loaded["display_name"])
+        self.assertEqual("English Voice", loaded["display_name"])
         self.assertEqual("references/ref_primary.wav", loaded["reference_files"][0]["path"])
         self.assertEqual(sha256_file(primary), sha256_file(live / "references/ref_primary.wav"))
         self.assertEqual(sha256_file(source_mix), sha256_file(live / "references/ref_source_mix.wav"))

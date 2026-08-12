@@ -6,6 +6,7 @@ import tempfile
 import unittest
 from contextlib import redirect_stdout
 from pathlib import Path
+from unittest import mock
 
 from voice_dubbing_runtime.cli import main
 
@@ -63,6 +64,30 @@ class CliTests(unittest.TestCase):
         self.assertEqual("Tên đã đổi", updated["display_name"])
         code, deleted = self.invoke(["profiles", "delete", "--profile-id", "preset_01", "--json"])
         self.assertEqual("deleted", deleted["status"])
+
+    @mock.patch("voice_dubbing_runtime.cli._run_repair", return_value=0)
+    def test_profiles_repair_known_dispatches_exact_consent_option(self, run_repair: mock.Mock) -> None:
+        consent = self.base / "duc-consent.json"
+        consent.write_text("{}", encoding="utf-8")
+        code = main(
+            [
+                "--profiles-root",
+                str(self.profiles),
+                "profiles",
+                "repair-known",
+                "--duc-bao-consent",
+                str(consent),
+                "--confirm-app-closed",
+                "--json",
+            ]
+        )
+        self.assertEqual(0, code)
+        run_repair.assert_called_once()
+        args, manager = run_repair.call_args.args
+        self.assertEqual("repair-known", args.profiles_command)
+        self.assertEqual(str(consent), args.duc_bao_consent)
+        self.assertTrue(args.confirm_app_closed)
+        self.assertEqual(self.profiles.resolve(), manager.root)
 
 
 if __name__ == "__main__":
