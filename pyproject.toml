@@ -1,6 +1,6 @@
 [project]
 name = "voice-dubbing-runtime"
-version = "0.1.0"
+version = "0.3.0"
 description = "Isolated CPU-only Voice Dubbing Phase 1 research probe"
 requires-python = ">=3.11,<3.12"
 dependencies = [

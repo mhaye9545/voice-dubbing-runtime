@@ -8,6 +8,8 @@ import os
 from datetime import datetime, timezone
 from pathlib import Path
 
+from voice_dubbing_runtime.paths import default_xtts_license_path
+
 
 MODEL_ID = "coqui/XTTS-v2"
 MODEL_REVISION = "6c2b0d75eae4b7047358e3b6bd9325f857d43f77"
@@ -18,9 +20,7 @@ SCOPE = "research_personal_poc_noncommercial"
 
 
 def acceptance_path() -> Path:
-    local = os.environ.get("LOCALAPPDATA")
-    base = Path(local) if local else Path.home() / ".local" / "share"
-    return base / "FrameExtractStudio" / "VoiceDubbing" / "licenses" / "coqui_xtts_v2_cpml.json"
+    return default_xtts_license_path()
 
 
 def main() -> int:

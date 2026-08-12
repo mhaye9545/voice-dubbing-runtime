@@ -1,0 +1,49 @@
+name: Bug report
+description: Báo lỗi có thể tái hiện trong Voice Dubbing Runtime.
+title: "[Bug]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Cảm ơn bạn đã báo lỗi. Hãy redact path cá nhân, token, secret và private voice data trước khi gửi.
+  - type: input
+    id: version
+    attributes:
+      label: Version hoặc commit
+      description: Ví dụ 0.3.0 hoặc commit SHA.
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Môi trường
+      description: Windows version, Python version và CPU.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Các bước tái hiện
+      description: Dùng fixture công khai/synthetic; không upload recording riêng tư.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Kết quả mong đợi
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Kết quả thực tế và log đã redact
+      description: Xóa path cá nhân, token, secret và private voice data khỏi log.
+    validations:
+      required: true
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Kiểm tra dữ liệu nhạy cảm
+      options:
+        - label: Tôi đã redact path cá nhân, token, secrets và private voice data.
+          required: true

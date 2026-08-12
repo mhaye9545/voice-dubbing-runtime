@@ -1,0 +1,70 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  windows-python311:
+    name: windows-python311
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Bootstrap development environment
+        shell: pwsh
+        run: |
+          $python = (Get-Command python).Source
+          & .\scripts\bootstrap_dev.ps1 -PythonExecutable $python -VenvPath .venv-ci
+
+      - name: Compile Python sources
+        shell: pwsh
+        run: |
+          & .\.venv-ci\Scripts\python.exe -m compileall -q voice_dubbing_runtime voice_dubbing_app tests scripts
+
+      - name: Verify vendor and source integrity
+        shell: pwsh
+        run: |
+          git ls-files --error-unmatch vendor/TTS_PROVENANCE.md
+          git ls-files --error-unmatch vendor/TTS-ff217b3f27b294de194cc59c5119d1e08b06413c/TTS/__init__.py
+          git ls-files --error-unmatch vendor/TTS-ff217b3f27b294de194cc59c5119d1e08b06413c/TTS/tts/configs/xtts_config.py
+          git ls-files --error-unmatch vendor/TTS-ff217b3f27b294de194cc59c5119d1e08b06413c/TTS/tts/models/xtts.py
+          git ls-files --error-unmatch vendor/TTS-ff217b3f27b294de194cc59c5119d1e08b06413c/TTS/vocoder/models/hifigan_generator.py
+          & .\.venv-ci\Scripts\python.exe -m unittest tests.test_tts_dependency_strategy tests.test_doctor -v
+
+      - name: Run P2 compatibility tests
+        shell: pwsh
+        run: |
+          & .\.venv-ci\Scripts\python.exe -m unittest tests.test_known_profile_repair tests.test_profiles tests.test_cli -v
+
+      - name: Run doctor
+        shell: pwsh
+        run: |
+          & .\.venv-ci\Scripts\python.exe -m voice_dubbing_runtime doctor --json
+
+      - name: Run full regression
+        shell: pwsh
+        run: |
+          & .\scripts\run_tests.ps1 -PythonExecutable .\.venv-ci\Scripts\python.exe
+
+      - name: Verify package imports and environment
+        shell: pwsh
+        run: |
+          & .\.venv-ci\Scripts\python.exe -c "import voice_dubbing_runtime, voice_dubbing_app; print('IMPORT_OK')"
+          & .\.venv-ci\Scripts\python.exe -m pip check
+
+      - name: Verify tracked source stayed unchanged
+        shell: pwsh
+        run: |
+          git diff --exit-code -- .

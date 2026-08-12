@@ -1,0 +1,8 @@
+# Self-contained Windows/Python 3.11 GUI and unit-test environment.
+huggingface-hub==0.36.2
+numpy==1.26.4
+psutil==7.2.2
+torch @ https://download.pytorch.org/whl/cpu/torch-2.6.0%2Bcpu-cp311-cp311-win_amd64.whl
+torchaudio @ https://download.pytorch.org/whl/cpu/torchaudio-2.6.0%2Bcpu-cp311-cp311-win_amd64.whl
+transformers==4.49.0
+PySide6==6.11.1
